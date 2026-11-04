@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{billNo}}</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        width: 72mm;
+        margin: 0 auto;
+        font: 12px/1.5 monospace;
+        color: #111;
+      }
+      .logo {
+        width: 180px;
+        height: 122px;
+        object-fit: cover;
+        object-position: 50% 37%;
+      }
+      .center {
+        text-align: center;
+      }
+      h1 {
+        font-size: 17px;
+      }
+      h2 {
+        font-size: 14px;
+      }
+      hr {
+        border: 0;
+        border-top: 1px dashed #444;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .item {
+        margin: 10px 0;
+      }
+      .bold {
+        font-weight: bold;
+        font-size: 14px;
+      }
+      p {
+        margin: 5px 0;
+      }
+      @media print {
+        @page {
+          size: 80mm auto;
+          margin: 4mm;
+        }
+        body {
+          margin: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="center">
+      {{#if logo}}<img class="logo" src="{{logo}}" alt="{{settings.company_name}}" />{{/if}}
+      <h1>{{settings.company_name}}</h1>
+      <p>{{settings.company_address}}</p>
+      <p>{{settings.company_phone}}</p>
+      <h2>BILL / INVOICE</h2>
+      <p>{{billNo}} · {{date billDate}}</p>
+      <strong>{{statusText}}</strong>
+    </div>
+    <hr />
+    <p>Patient: {{patient.fullName}}</p>
+    <p>Phone: {{patient.phone}}</p>
+    <p>Nurse: {{request.nurse.fullName}}</p>
+    <hr />
+    {{#each items}}
+    <div class="item">
+      <strong>{{description}}</strong>
+      <div>{{quantity}} × {{money rate}} = {{money amount}}</div>
+    </div>
+    {{/each}}
+    <hr />
+    <div class="row"><span>Subtotal</span><span>{{money subtotal}}</span></div>
+    <div class="row"><span>Extra charges</span><span>{{money extraCharges}}</span></div>
+    <p>{{extraChargesNote}}</p>
+    <div class="row"><span>Discount</span><span>{{money discount}}</span></div>
+    <div class="row"><span>Tax {{taxPercent}}%</span><span>{{money taxAmount}}</span></div>
+    <hr />
+    <div class="row bold"><span>TOTAL</span><span>{{money total}}</span></div>
+    <div class="row"><span>Paid</span><span>{{money paidAmount}}</span></div>
+    <div class="row bold"><span>BALANCE</span><span>{{money balance}}</span></div>
+    <hr />
+    {{#if cancelled}}
+    <p>CANCELLED: {{cancelReason}}</p>
+    {{/if}}
+    <p>{{notes}}</p>
+    <p class="center">{{settings.bill_footer}}</p>
+    {{#if autoPrint}}
+    <script>
+      window.addEventListener('load', () => window.print());
+    </script>
+    {{/if}}
+  </body>
+</html>

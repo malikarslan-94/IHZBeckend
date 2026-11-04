@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.git
+.env
+.env.*
+!.env.example
+.local
+*.log
+*.dump
+*.sql.gz
+*.pem
+*.key
+.DS_Store

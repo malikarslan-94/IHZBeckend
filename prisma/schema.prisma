@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  ADMIN
+  STAFF
+  NURSE
+}
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+enum ServiceUnit {
+  PER_VISIT
+  PER_DAY
+  PER_SHIFT
+  PER_HOUR
+  PER_ITEM
+}
+enum VisitType {
+  SINGLE_VISIT
+  DAILY_VISITS
+  SHIFT_12H
+  SHIFT_24H
+  OTHER
+}
+enum RequestStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+enum BillStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  CANCELLED
+}
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  JAZZCASH
+  EASYPAISA
+  CHEQUE
+  OTHER
+}
+model User {
+  id Int @id @default(autoincrement())
+  name String
+  username String @unique
+  passwordHash String
+  role Role @default(STAFF)
+  nurseId Int? @unique
+  nurse Nurse? @relation(fields: [nurseId], references: [id])
+  isActive Boolean @default(true)
+  tokenVersion Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Patient {
+  id Int @id @default(autoincrement())
+  patientCode String @unique
+  fullName String
+  phone String
+  altPhone String?
+  address String
+  area String?
+  city String?
+  age Int?
+  gender Gender?
+  guardianName String?
+  guardianRelation String?
+  medicalNotes String?
+  requests ServiceRequest[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([phone])
+  @@index([fullName])
+}
+model Nurse {
+  id Int @id @default(autoincrement())
+  fullName String
+  phone String
+  cnic String? @unique
+  gender Gender?
+  qualification String?
+  isActive Boolean @default(true)
+  user User?
+  requests ServiceRequest[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Service {
+  id Int @id @default(autoincrement())
+  name String @unique
+  category String
+  unit ServiceUnit
+  defaultRate Decimal @db.Decimal(12,2)
+  description String?
+  isActive Boolean @default(true)
+  items RequestItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model ServiceRequest {
+  id Int @id @default(autoincrement())
+  requestNo String @unique
+  patientId Int
+  patient Patient @relation(fields: [patientId], references: [id])
+  nurseId Int?
+  nurse Nurse? @relation(fields: [nurseId], references: [id])
+  requestDate DateTime @default(now())
+  startDate DateTime?
+  endDate DateTime?
+  visitType VisitType
+  serviceAddress String
+  status RequestStatus @default(NEW)
+  notes String?
+  items RequestItem[]
+  bill Bill?
+  createdById Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status])
+  @@index([nurseId])
+  @@index([requestDate])
+}
+model RequestItem {
+  id Int @id @default(autoincrement())
+  requestId Int
+  request ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  serviceId Int
+  service Service @relation(fields: [serviceId], references: [id])
+  description String
+  serviceDate DateTime?
+  quantity Decimal @db.Decimal(10,2)
+  unit ServiceUnit
+  rate Decimal @db.Decimal(12,2)
+  amount Decimal @db.Decimal(12,2)
+  sortOrder Int @default(0)
+}
+model Bill {
+  id Int @id @default(autoincrement())
+  billNo String @unique
+  requestId Int @unique
+  request ServiceRequest @relation(fields: [requestId], references: [id])
+  billDate DateTime @default(now())
+  subtotal Decimal @db.Decimal(12,2)
+  extraCharges Decimal @default(0) @db.Decimal(12,2)
+  extraChargesNote String?
+  discount Decimal @default(0) @db.Decimal(12,2)
+  taxPercent Decimal @default(0) @db.Decimal(5,2)
+  taxAmount Decimal @default(0) @db.Decimal(12,2)
+  total Decimal @db.Decimal(12,2)
+  paidAmount Decimal @default(0) @db.Decimal(12,2)
+  balance Decimal @db.Decimal(12,2)
+  status BillStatus @default(UNPAID)
+  notes String?
+  cancelReason String?
+  cancelledAt DateTime?
+  payments Payment[]
+  createdById Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status])
+  @@index([billDate])
+}
+model Payment {
+  id Int @id @default(autoincrement())
+  receiptNo String @unique
+  billId Int
+  bill Bill @relation(fields: [billId], references: [id])
+  paymentDate DateTime @default(now())
+  amount Decimal @db.Decimal(12,2)
+  method PaymentMethod
+  referenceNo String?
+  notes String?
+  receivedById Int
+  createdAt DateTime @default(now())
+  @@index([paymentDate])
+}
+model Counter {
+  key String @id
+  value Int @default(0)
+}
+model Setting {
+  key String @id
+  value String
+}
+model ActivityLog {
+  id Int @id @default(autoincrement())
+  userId Int
+  action String
+  entityType String
+  entityId Int
+  details Json?
+  createdAt DateTime @default(now())
+  @@index([entityType, entityId])
+}

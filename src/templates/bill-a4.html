@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{billNo}}</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: #233a43;
+        background: white;
+        font:
+          12px/1.55 Arial,
+          sans-serif;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 30px;
+        border-bottom: 3px solid #087f83;
+        padding-bottom: 22px;
+      }
+      .brand {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .logo {
+        width: 110px;
+        height: 78px;
+        object-fit: cover;
+        object-position: 50% 37%;
+        flex-shrink: 0;
+      }
+      h1 {
+        font-size: 20px;
+        color: #087f83;
+        margin: 0 0 7px;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0;
+      }
+      .muted {
+        color: #6b7b82;
+      }
+      .invoice {
+        text-align: right;
+      }
+      .status {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        background: #edf5f4;
+        font-weight: bold;
+        margin-top: 8px;
+      }
+      .details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin: 24px 0;
+      }
+      .label {
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #74818a;
+        font-size: 10px;
+        margin-bottom: 8px;
+      }
+      .name {
+        font-size: 16px;
+        font-weight: bold;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+      }
+      thead {
+        display: table-header-group;
+      }
+      th {
+        background: #edf5f4;
+        color: #45626b;
+        text-align: left;
+        font-size: 10px;
+        text-transform: uppercase;
+        padding: 8px 7px;
+      }
+      td {
+        border-bottom: 1px solid #e4eaea;
+        padding: 8px 7px;
+        vertical-align: top;
+      }
+      tr {
+        break-inside: avoid;
+      }
+      td.num,
+      th.num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .totals {
+        width: 48%;
+        margin-left: auto;
+        break-inside: avoid;
+      }
+      .total {
+        font-size: 15px;
+        font-weight: bold;
+        background: #eef8f7;
+      }
+      .balance {
+        font-size: 15px;
+        font-weight: bold;
+        border-top: 2px solid #087f83;
+      }
+      .words {
+        padding: 10px 0;
+        font-style: italic;
+      }
+      .terms {
+        border-top: 1px solid #e4eaea;
+        margin-top: 25px;
+        padding-top: 14px;
+        white-space: pre-line;
+        font-size: 11px;
+      }
+      .signature {
+        margin: 25px 0 12px auto;
+        width: 170px;
+        border-top: 1px solid #82969e;
+        text-align: center;
+        padding-top: 5px;
+      }
+      .footer {
+        text-align: center;
+        color: #087f83;
+        margin-top: 12px;
+      }
+      .watermark {
+        position: fixed;
+        top: 45%;
+        left: 10%;
+        font-size: 65px;
+        color: rgba(130, 130, 130, 0.15);
+        transform: rotate(-25deg);
+        pointer-events: none;
+      }
+      p {
+        margin: 3px 0;
+      }
+      .notes {
+        white-space: pre-line;
+      }
+      @media print {
+        body {
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    {{#if cancelled}}
+    <div class="watermark">CANCELLED</div>
+    {{/if}}
+    <header>
+      <div class="brand">
+        {{#if logo}}<img class="logo" src="{{logo}}" alt="{{settings.company_name}}" />{{/if}}
+        <div>
+          <h1>{{settings.company_name}}</h1>
+          <p>{{settings.company_address}}</p>
+          <p>{{settings.company_phone}} · {{settings.company_whatsapp}}</p>
+          <p>{{settings.company_email}}</p>
+        </div>
+      </div>
+      <div class="invoice">
+        <h2>BILL / INVOICE</h2>
+        <p><strong>{{billNo}}</strong></p>
+        <p>{{date billDate}}</p>
+        <p class="muted">Request {{request.requestNo}}</p>
+        <span class="status">{{statusText}}</span>
+      </div>
+    </header>
+    <section class="details">
+      <div>
+        <div class="label">Patient details</div>
+        <div class="name">{{patient.fullName}}</div>
+        <p>{{patient.patientCode}} · {{patient.phone}}</p>
+        <p>{{#if patient.age}}Age {{patient.age}}{{/if}} {{label patient.gender}}</p>
+        {{#if patient.guardianName}}
+        <p>Guardian: {{patient.guardianName}} ({{patient.guardianRelation}})</p>
+        {{/if}}
+        <p>{{request.serviceAddress}}</p>
+      </div>
+      <div>
+        <div class="label">Service details</div>
+        <div class="name">
+          {{#if request.nurse}}{{request.nurse.fullName}}{{else}}Nurse not assigned{{/if}}
+        </div>
+        {{#if showNursePhone}}
+        <p>{{request.nurse.phone}}</p>
+        {{/if}}
+        <p>{{label request.visitType}}</p>
+        <p>{{date request.startDate}} – {{date request.endDate}}</p>
+      </div>
+    </section>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>Description</th>
+          <th class="num">Qty</th>
+          <th>Unit</th>
+          <th class="num">Rate</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each items}}
+        <tr>
+          <td>{{inc @index}}</td>
+          <td>{{date serviceDate}}</td>
+          <td>{{description}}</td>
+          <td class="num">{{quantity}}</td>
+          <td>{{label unit}}</td>
+          <td class="num">{{money rate}}</td>
+          <td class="num">{{money amount}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    <table class="totals">
+      <tbody>
+        <tr>
+          <td>Subtotal</td>
+          <td class="num">{{money subtotal}}</td>
+        </tr>
+        <tr>
+          <td>Extra charges {{#if extraChargesNote}}<br /><small>{{extraChargesNote}}</small>{{/if}}</td>
+          <td class="num">{{money extraCharges}}</td>
+        </tr>
+        <tr>
+          <td>Discount</td>
+          <td class="num">− {{money discount}}</td>
+        </tr>
+        <tr>
+          <td>Tax ({{taxPercent}}%)</td>
+          <td class="num">{{money taxAmount}}</td>
+        </tr>
+        <tr class="total">
+          <td>TOTAL</td>
+          <td class="num">{{money total}}</td>
+        </tr>
+        <tr>
+          <td>Paid</td>
+          <td class="num">{{money paidAmount}}</td>
+        </tr>
+        <tr class="balance">
+          <td>BALANCE DUE</td>
+          <td class="num">{{money balance}}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="words">{{amountWords}}</p>
+    {{#if payments}}
+    <div class="label">Payment history</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Receipt</th>
+          <th>Method</th>
+          <th>Reference</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each payments}}
+        <tr>
+          <td>{{date paymentDate}}</td>
+          <td>{{receiptNo}}</td>
+          <td>{{label method}}</td>
+          <td>{{referenceNo}}</td>
+          <td class="num">{{money amount}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}} {{#if notes}}
+    <p class="notes"><strong>Notes</strong><br />{{notes}}</p>
+    {{/if}}{{#if cancelled}}
+    <p>Cancellation reason: {{cancelReason}}</p>
+    {{/if}}
+    <div class="terms">{{settings.terms_text}}</div>
+    <div class="signature">Authorized signature</div>
+    <div class="footer">{{settings.bill_footer}}</div>
+    {{#if autoPrint}}
+    <script>
+      window.addEventListener('load', () => window.print());
+    </script>
+    {{/if}}
+  </body>
+</html>

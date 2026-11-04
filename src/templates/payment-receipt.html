@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{receiptNo}}</title>
+    <style>
+      body { font:14px/1.7 Arial,sans-serif; color:#233a43; margin:24px; }
+      .logo { width: 140px; height: 96px; object-fit: cover; object-position: 50% 37%; }
+      h1 { color:#087f83; font-size:22px; }
+      table { width:100%; border-collapse:collapse; }
+      td { padding:8px 0; border-bottom:1px solid #ddd; }
+      td:last-child { text-align:right; }
+      .amount { font-size:20px; font-weight:bold; }
+      {{#if thermal}}
+      body { width:72mm; font:12px/1.6 monospace; margin:0 auto; }
+      @media print { @page { size:80mm auto; margin:4mm; } }
+      {{else}}
+      @media print { @page { size:A4; margin:12mm; } }
+      {{/if}}
+    </style>
+  </head>
+  <body>
+    {{#if logo}}<img class="logo" src="{{logo}}" alt="{{settings.company_name}}" />{{/if}}
+    <h1>{{settings.company_name}}</h1>
+    <p>{{settings.company_address}}<br />{{settings.company_phone}}</p>
+    <h2>PAYMENT RECEIPT</h2>
+    <table>
+      <tr>
+        <td>Receipt</td>
+        <td>{{receiptNo}}</td>
+      </tr>
+      <tr>
+        <td>Date</td>
+        <td>{{date paymentDate}}</td>
+      </tr>
+      <tr>
+        <td>Bill</td>
+        <td>{{bill.billNo}}</td>
+      </tr>
+      <tr>
+        <td>Patient</td>
+        <td>{{patient}}</td>
+      </tr>
+      <tr class="amount">
+        <td>Amount received</td>
+        <td>{{money amount}}</td>
+      </tr>
+      <tr>
+        <td>Method</td>
+        <td>{{label method}}</td>
+      </tr>
+      <tr>
+        <td>Reference</td>
+        <td>{{referenceNo}}</td>
+      </tr>
+      <tr>
+        <td>Current remaining balance</td>
+        <td>{{money bill.balance}}</td>
+      </tr>
+    </table>
+    <p>{{settings.bill_footer}}</p>
+    <script>
+      window.addEventListener('load', () => window.print());
+    </script>
+  </body>
+</html>
