@@ -38,6 +38,14 @@ Configure `DATABASE_URL`, `JWT_SECRET`, `CLIENT_URL` (the frontend origin), and
 `NODE_ENV=production` in the hosting provider. Set `PORT` if the host requires it.
 Environment files and credentials are excluded from Git and Docker build contexts.
 
+Set `CLIENT_URL=*` to allow any HTTP(S) frontend origin, or use a single URL to
+limit access to that origin. CORS reflects allowed origins so cookie credentials
+work. Production session cookies use `SameSite=None; Secure` for cross-site
+requests; development cookies keep `SameSite=Lax` for local HTTP.
+Frontends must send `credentials: 'include'` (or Axios `withCredentials: true`)
+and `X-Requested-With: HomeNursing` on POST, PUT, PATCH, and DELETE requests.
+Browser restrictions on third-party cookies can still affect cross-site sessions.
+
 ```sh
 npm ci --include=dev
 npm run db:generate

@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env.js';
+import { isAllowedOrigin } from './config/origins.js';
 import { auth, csrf } from './middleware/auth.js';
 import { office } from './middleware/requireRole.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -22,7 +22,10 @@ export const app = express();
 app.disable('x-powered-by');
 app.use(
   helmet(),
-  cors({ origin: env.CLIENT_URL, credentials: true }),
+  cors({
+    origin: (origin, callback) => callback(null, !origin || isAllowedOrigin(origin)),
+    credentials: true,
+  }),
   express.json({ limit: '1mb' }),
   cookieParser(),
   csrf,
