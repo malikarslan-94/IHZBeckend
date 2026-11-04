@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Decimal } from 'decimal.js';
 export const roles = ['ADMIN', 'STAFF', 'NURSE'] as const;
 export const genders = ['MALE', 'FEMALE', 'OTHER'] as const;
 export const units = ['PER_VISIT', 'PER_DAY', 'PER_SHIFT', 'PER_HOUR', 'PER_ITEM'] as const;
@@ -19,10 +20,18 @@ export const moneySchema = z.coerce
   .min(0)
   .max(9999999999.99)
   .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 0.0001, 'Use no more than two decimal places.');
-export const dateSchema = z.preprocess(
-  (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00+05:00` : v),
-  z.coerce.date(),
-);
+export const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid date.')
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(+date) && date.toISOString().slice(0, 10) === value;
+  }, 'Enter a valid calendar date.');
+export const dateSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') return value;
+  if (!calendarDateSchema.safeParse(value.slice(0, 10)).success) return value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T00:00:00+05:00`);
+  if (z.string().datetime({ offset: true }).safeParse(value).success) return new Date(value);
+  return value;
+}, z.date({ invalid_type_error: 'Enter a valid date.', required_error: 'Enter a valid date.' }));
 export const patientSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name is required.').max(120),
   phone: phoneSchema,
@@ -60,12 +69,18 @@ export const itemSchema = z.object({
   quantity: moneySchema.refine((v) => v > 0 && v <= 99999999.99, 'Quantity must be greater than zero.'),
   rate: moneySchema.optional(),
   sortOrder: z.number().int().min(0).optional(),
+}).superRefine((item, context) => {
+  if (item.rate !== undefined && new Decimal(item.quantity).mul(item.rate).toDecimalPlaces(2).gt('9999999999.99'))
+    context.addIssue({ code: 'custom', path: ['rate'], message: 'Line amount exceeds the supported limit.' });
 });
 export const billSchema = z.object({
   extraCharges: moneySchema.default(0),
   extraChargesNote: optionalText,
   discount: moneySchema.default(0),
-  taxPercent: moneySchema.pipe(z.number().max(100)).optional(),
+  taxPercent: z.preprocess(
+    (value) => value === '' || value === null ? undefined : value,
+    moneySchema.pipe(z.number().max(100)).optional(),
+  ),
   notes: optionalText,
 });
 export const requestFields = z.object({
@@ -90,6 +105,8 @@ export const requestSchema = requestFields.superRefine((v, c) => {
     c.addIssue({ code: 'custom', path: ['endDate'], message: 'End date must be on or after start date.' });
   if (v.generateBill && !v.items.length)
     c.addIssue({ code: 'custom', path: ['items'], message: 'Add at least one service to generate a bill.' });
+  if (v.status === 'ASSIGNED' && !v.nurseId)
+    c.addIssue({ code: 'custom', path: ['nurseId'], message: 'Assign a nurse before marking the request assigned.' });
 });
 export const paymentSchema = z
   .object({

@@ -122,6 +122,7 @@ model ServiceRequest {
   serviceAddress String
   status RequestStatus @default(NEW)
   notes String?
+  draftCharges RequestDraftCharges?
   items RequestItem[]
   bill Bill?
   createdById Int
@@ -130,6 +131,15 @@ model ServiceRequest {
   @@index([status])
   @@index([nurseId])
   @@index([requestDate])
+}
+model RequestDraftCharges {
+  requestId Int @id
+  request ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  extraCharges Decimal @default(0) @db.Decimal(12,2)
+  extraChargesNote String?
+  discount Decimal @default(0) @db.Decimal(12,2)
+  taxPercent Decimal? @db.Decimal(5,2)
+  notes String?
 }
 model RequestItem {
   id Int @id @default(autoincrement())

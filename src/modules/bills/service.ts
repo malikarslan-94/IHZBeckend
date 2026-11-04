@@ -9,6 +9,7 @@ import { billSchema } from '../../../shared/schema.js';
 export const requestInclude = {
   patient: true,
   nurse: true,
+  draftCharges: true,
   items: { orderBy: { sortOrder: 'asc' as const } },
   bill: { include: { payments: { orderBy: { paymentDate: 'asc' as const } } } },
 };
@@ -44,12 +45,22 @@ export async function recalculate(tx: Prisma.TransactionClient, billId: number) 
     include: billInclude,
   });
 }
-export async function billCharges(tx: Prisma.TransactionClient, input: unknown, user: SessionUser) {
-  const data = billSchema.parse(input ?? {});
+export async function billCharges(
+  tx: Prisma.TransactionClient,
+  input: unknown,
+  user: SessionUser,
+  draft?: unknown,
+) {
+  const supplied = billSchema.partial().parse(input ?? {});
+  const saved = billSchema.parse(draft ?? {});
+  const data = billSchema.parse({
+    ...saved,
+    ...Object.fromEntries(Object.entries(supplied).filter(([, value]) => value !== undefined)),
+  });
   const setting = await tx.setting.findUnique({ where: { key: 'tax_percent' } });
   const tax = Number(setting?.value || 0);
   assert(
-    user.role === 'ADMIN' || data.taxPercent === undefined || data.taxPercent === tax,
+    user.role === 'ADMIN' || supplied.taxPercent === undefined || supplied.taxPercent === tax,
     403,
     'TAX_ROLE',
     'Only an admin can change the tax rate.',
@@ -66,7 +77,7 @@ export async function generateBill(
   assert(!request.bill, 409, 'BILL_EXISTS', 'This request already has a bill.');
   assert(request.status !== 'CANCELLED', 409, 'CANCELLED', 'A cancelled request cannot be billed.');
   assert(request.items.length, 422, 'EMPTY_BILL', 'Add at least one service before generating a bill.');
-  const charges = await billCharges(tx, input, user);
+  const charges = await billCharges(tx, input, user, request.draftCharges);
   const year = karachiYear();
   const prefix = (await tx.setting.findUnique({ where: { key: 'bill_prefix' } }))?.value || 'HN';
   const bill = await tx.bill.create({
@@ -96,6 +107,10 @@ export async function snapshotItems(tx: Prisma.TransactionClient, items: any[], 
       );
       const same = previous?.serviceId === service.id;
       const rate = item.rate ?? (same ? previous.rate : service.defaultRate);
+      const amount = new Decimal(item.quantity).mul(rate).toDecimalPlaces(2);
+      assert(amount.lte('9999999999.99'), 422, 'AMOUNT_TOO_LARGE', 'Line amount exceeds the supported limit.', {
+        [`items.${sortOrder}.rate`]: 'Line amount exceeds the supported limit.',
+      });
       return {
         serviceId: service.id,
         description: item.description ?? (same ? previous.description : service.name),
@@ -103,7 +118,7 @@ export async function snapshotItems(tx: Prisma.TransactionClient, items: any[], 
         serviceDate: item.serviceDate ?? null,
         quantity: item.quantity,
         rate,
-        amount: new Decimal(item.quantity).mul(rate).toDecimalPlaces(2).toFixed(2),
+        amount: amount.toFixed(2),
         sortOrder,
       };
     }),

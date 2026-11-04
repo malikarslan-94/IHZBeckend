@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import { z } from 'zod';
+import { calendarDateSchema } from '../../shared/schema.js';
 export function query(req: Request, allowedSort: string[], fallback = 'createdAt') {
   const q = z
     .object({
@@ -8,14 +9,8 @@ export function query(req: Request, allowedSort: string[], fallback = 'createdAt
       pageSize: z.coerce.number().int().min(1).max(100).default(20),
       sortBy: z.string().optional(),
       sortDir: z.enum(['asc', 'desc']).default('desc'),
-      from: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional(),
-      to: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional(),
+      from: calendarDateSchema.optional(),
+      to: calendarDateSchema.optional(),
     })
     .parse(req.query);
   return {

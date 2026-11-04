@@ -67,5 +67,30 @@ npm test
 npm run build
 ```
 
-`npm run test:api` runs the database integration suite using a temporary PostgreSQL
-schema and removes that schema afterward. Run it against a dedicated test database.
+`npm run test:api` runs the database integration suites using temporary PostgreSQL
+schemas and removes those schemas afterward. Set `TEST_DATABASE_URL` explicitly to
+a dedicated test database; the suites refuse to fall back to the application database:
+
+```sh
+TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5434/postgres npm run test:api
+```
+
+## Draft billing charges
+
+Requests now retain draft extra charges, discounts, tax, charge descriptions and
+invoice notes. Generating the bill later restores these values; a blank tax input
+uses the saved rate or configured default, and an explicit admin zero rate remains
+zero. Existing requests without saved draft charges use the configured default.
+
+Deploy the additive migration `20261104000000_request_draft_charges` and regenerate
+the Prisma client before running the updated API:
+
+```sh
+npm run db:generate
+npm run db:deploy
+npm run build
+```
+
+The migration creates a separate draft-charge table; it does not modify existing
+bills. Values discarded by the previous application cannot be reconstructed by
+this migration.

@@ -15,7 +15,9 @@ import {
   generateBill,
   snapshotItems,
   requestInclude,
+  billCharges,
 } from '../bills/service.js';
+import { calculateBill } from '../../lib/billCalculator.js';
 export const requestRoutes = Router();
 const nurseInclude = {
   patient: {
@@ -89,6 +91,8 @@ requestRoutes.post('/', office, async (req, res) => {
           'Choose an active nurse.',
         );
       const items = await snapshotItems(tx, input.items);
+      const charges = await billCharges(tx, input.charges, req.user);
+      calculateBill(items, charges);
       const request = await tx.serviceRequest.create({
         data: {
           requestNo: await nextNumber(tx, 'REQ', 'IHZ-'),
@@ -103,13 +107,14 @@ requestRoutes.post('/', office, async (req, res) => {
           status: input.nurseId ? 'ASSIGNED' : 'NEW',
           createdById: req.user.id,
           items: { create: items },
+          draftCharges: { create: charges },
         },
       });
       await log(tx, req.user.id, 'CREATE', 'ServiceRequest', request.id, {
         requestNo: request.requestNo,
         items,
       });
-      if (input.generateBill) await generateBill(tx, request.id, input.charges, req.user);
+      if (input.generateBill) await generateBill(tx, request.id, undefined, req.user);
       return tx.serviceRequest.findUniqueOrThrow({ where: { id: request.id }, include: requestInclude });
     },
     { timeout: 15000 },
@@ -156,6 +161,13 @@ requestRoutes.patch('/:id', office, async (req, res) => {
       );
     if (data.nurseId && before.status === 'NEW' && !data.status) data.status = 'ASSIGNED';
     if (data.nurseId === null && before.status === 'ASSIGNED' && !data.status) data.status = 'NEW';
+    assert(
+      (data.status ?? before.status) !== 'ASSIGNED' || merged.nurseId,
+      422,
+      'NURSE_REQUIRED',
+      'Assign a nurse before marking the request assigned.',
+      { nurseId: 'Assign a nurse before marking the request assigned.' },
+    );
     const after = await tx.serviceRequest.update({ where: { id: before.id }, data, include: requestInclude });
     await log(tx, req.user.id, 'UPDATE', 'ServiceRequest', before.id, { changes: data });
     return after;
@@ -194,6 +206,10 @@ async function changeItems(req: any, mode: 'replace' | 'add' | 'edit' | 'delete'
       'A billed request must have at least one line.',
     );
     const items = await snapshotItems(tx, inputs, request.items);
+    if (!request.bill) {
+      const charges = await billCharges(tx, undefined, req.user, request.draftCharges);
+      calculateBill(items, charges);
+    }
     await tx.requestItem.deleteMany({ where: { requestId: request.id } });
     await tx.requestItem.createMany({ data: items.map((i) => ({ ...i, requestId: request.id })) });
     if (request.bill) await recalculate(tx, request.bill.id);
