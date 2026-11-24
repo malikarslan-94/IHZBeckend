@@ -103,7 +103,7 @@
 
       <div class="after">
         <div class="byline">
-          <p>{{#if preparedBy}}{{preparedBy}} @ {{/if}}{{dateTime createdAt}}</p>
+          <p><b>Prepared by:</b> {{#if preparedBy}}{{preparedBy}} @ {{/if}}{{dateTime createdAt}}</p>
           {{#if notes}}<p class="pre"><b>Remarks:</b> {{notes}}</p>{{/if}}
           {{#if cancelled}}<p><b>Cancelled:</b> {{cancelReason}}</p>{{/if}}
         </div>

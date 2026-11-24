@@ -272,7 +272,8 @@ async function changeChargeLines(req: any, mode: 'replace' | 'add' | 'delete') {
       rate: Number(l.rate),
     }));
     let inputs: any[];
-    if (mode === 'replace') inputs = chargeLinesSchema.parse(req.body);
+    // The body is a bare array; wrapping it keys errors as chargeLines.N.field, like the other routes.
+    if (mode === 'replace') inputs = z.object({ chargeLines: chargeLinesSchema }).parse({ chargeLines: req.body }).chargeLines;
     else if (mode === 'add')
       inputs = [...current, nurse ? nurseChargeSchema.parse(req.body) : chargeLineSchema.parse(req.body)];
     else {
