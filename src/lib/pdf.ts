@@ -66,7 +66,8 @@ async function letterhead(format: PrintFormat) {
       .split(/\r?\n/)
       .map((line) => line.replace(/^\s*\d{1,2}\s*[).:-]+\s+/, '').trim())
       .filter(Boolean),
-    styles: format === 'thermal' ? '' : await styles(),
+    // A whole <style> tag, so the templates keep Handlebars out of their CSS (the editor reads it as CSS).
+    styleTag: format === 'thermal' ? '' : `<style>${await styles()}</style>`,
     twoUp: format === 'a4',
     copies: format === 'a4' ? [{ copyName: 'Patient copy' }, { copyName: 'Office copy' }] : [{ copyName: '' }],
   };
@@ -122,7 +123,7 @@ export async function closeBrowser() {
 }
 // Margins match the @page rules in the A5 templates.
 const pageLayouts: Record<Exclude<PrintFormat, 'thermal'>, PDFOptions> = {
-  a5: { format: 'A5', landscape: true, margin: { top: '6mm', right: '9mm', bottom: '5mm', left: '0' } },
+  a5: { format: 'A5', landscape: true, margin: { top: '6mm', right: '9mm', bottom: '5mm', left: '9mm' } },
   a4: { format: 'A4', margin: { top: '0', right: '0', bottom: '0', left: '0' } },
 };
 export async function createPdf(html: string, format: PrintFormat) {

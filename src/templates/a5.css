@@ -1,5 +1,5 @@
 /* Shared look for the A5 bill and payment receipt (A5 landscape: 210mm x 148mm),
-   laid out like the IDC registration slip. No left padding; right padding only. */
+   laid out like the IDC registration slip, with equal left and right padding. */
 * {
   box-sizing: border-box;
 }
@@ -28,7 +28,7 @@ p {
   width: 210mm;
   min-height: 148mm;
   margin: 0 auto;
-  padding: 6mm 9mm 5mm 0;
+  padding: 6mm 9mm 5mm;
   background: #fff;
 }
 .watermark {
@@ -162,7 +162,9 @@ tr {
 .items td:last-child {
   padding-right: 0;
 }
-.num {
+/* .items th sets left alignment, so number headers need the stronger selector too. */
+.num,
+.items th.num {
   text-align: right;
   white-space: nowrap;
 }

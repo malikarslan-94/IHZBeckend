@@ -3,16 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <title>{{receiptNo}}</title>
-    <style>
-      {{{styles}}}
-    </style>
-    <style>
-      {{#if twoUp}}
-      @page { size: A4 portrait; margin: 0; }
-      {{else}}
-      @page { size: A5 landscape; margin: 6mm 9mm 5mm 0; }
-      {{/if}}
-    </style>
+    {{{styleTag}}}
+    {{#if twoUp}}
+    <style>@page { size: A4 portrait; margin: 0; }</style>
+    {{else}}
+    <style>@page { size: A5 landscape; margin: 6mm 9mm 5mm; }</style>
+    {{/if}}
   </head>
   <body class="{{#if twoUp}}two-up{{else}}single{{/if}}">
     {{#*inline "slip"}}
