@@ -21,6 +21,16 @@ export function dateText(value: Date | string | null | undefined) {
     .format(new Date(value))
     .replace(/ /g, '-');
 }
+export function dateTimeText(value: Date | string | null | undefined) {
+  if (!value) return '—';
+  const time = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Karachi',
+  }).format(new Date(value));
+  return `${dateText(value)} ${time}`;
+}
 export function dateRange(from?: string, to?: string) {
   z.object({ from: calendarDateSchema.optional(), to: calendarDateSchema.optional() }).parse({ from, to });
   if (from && to && from > to)

@@ -7,7 +7,7 @@ import { assert } from '../../lib/errors.js';
 import { nextNumber } from '../../lib/numberGenerator.js';
 import { log } from '../../lib/activity.js';
 import { lockBill, recalculate, billInclude } from '../bills/service.js';
-import { receiptHtml } from '../../lib/pdf.js';
+import { receiptHtml, printFormats } from '../../lib/pdf.js';
 import { z } from 'zod';
 export const paymentRoutes = Router();
 paymentRoutes.use(office);
@@ -64,7 +64,7 @@ paymentRoutes.get('/payments/:id/receipt', async (req, res) => {
     where: { id: id(req.params.id) },
     include: { bill: { include: billInclude } },
   });
-  const format = z.enum(['a4', 'thermal']).default('a4').parse(req.query.format);
+  const format = z.enum(printFormats).default('a5').parse(req.query.format);
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'self'",

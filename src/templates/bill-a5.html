@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{billNo}}</title>
+    <style>
+      {{{styles}}}
+    </style>
+    <style>
+      {{#if twoUp}}
+      @page { size: A4 portrait; margin: 0; }
+      {{else}}
+      @page { size: A5 landscape; margin: 6mm 9mm 5mm 0; }
+      {{/if}}
+    </style>
+  </head>
+  <body class="{{#if twoUp}}two-up{{else}}single{{/if}}">
+    {{#*inline "slip"}}
+    <section class="sheet">
+      {{#if cancelled}}<div class="watermark">CANCELLED</div>{{/if}}
+      <header class="head">
+        <div class="brand">
+          {{#if logo}}<img class="logo" src="{{logo}}" alt="" />{{/if}}
+          <div>
+            <h1>{{settings.company_name}}</h1>
+            {{#if settings.company_email}}<p>Email: {{settings.company_email}}</p>{{/if}}
+            {{#if whatsapp}}<p>WhatsApp: {{whatsapp}}</p>{{/if}}
+          </div>
+        </div>
+        <div class="contact">
+          {{#if copyName}}<p class="copy">{{copyName}}</p>{{/if}}
+          {{#if settings.company_address}}<p>{{settings.company_address}}</p>{{/if}}
+          {{#if settings.company_phone}}<p>Phone: {{settings.company_phone}}</p>{{/if}}
+        </div>
+      </header>
+
+      <div class="band">
+        <span>Patient ID: {{patient.patientCode}}</span>
+        <span>Request#: {{request.requestNo}}</span>
+        <span>Bill#: {{billNo}}</span>
+      </div>
+
+      <div class="info">
+        <p class="field"><b>Name:</b> <span class="strong">{{patient.fullName}}</span></p>
+        <p class="field"><b>Age/Gender:</b> <span>{{patient.ageGender}}</span></p>
+        <p class="field"><b>Date:</b> <span>{{date billDate}}</span></p>
+
+        <p class="field"><b>Guardian:</b> <span>{{patient.guardian}}</span></p>
+        <p class="field"><b>Contact:</b> <span>{{patient.phone}}</span></p>
+        <p class="field"><b>Period:</b> <span>{{servicePeriod}}</span></p>
+
+        <p class="field"><b>Address:</b> <span>{{request.serviceAddress}}</span></p>
+        <p class="field">
+          <b>Nurse:</b>
+          <span>{{#if request.nurse}}{{request.nurse.fullName}}{{#if showNursePhone}} ({{request.nurse.phone}}){{/if}}{{else}}Not assigned{{/if}}</span>
+        </p>
+        <p class="field"><b>Visit Type:</b> <span>{{visitTypeText}}</span></p>
+      </div>
+
+      <table class="items">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Service Date</th>
+            <th class="num">Qty</th>
+            <th class="num">Rate</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{description}}</td>
+            <td>{{date serviceDate}}</td>
+            <td class="num">{{quantity}} <span class="unit">{{label unit}}</span></td>
+            <td class="num">{{num rate}}</td>
+            <td class="num">{{num amount}}</td>
+          </tr>
+          {{/each}}
+          {{#if chargeLines.length}}
+          <tr class="group">
+            <td colspan="5">Additional charges</td>
+          </tr>
+          {{#each chargeLines}}
+          <tr>
+            <td>{{description}}</td>
+            <td></td>
+            <td class="num">{{quantity}}</td>
+            <td class="num">{{num rate}}</td>
+            <td class="num">{{num amount}}</td>
+          </tr>
+          {{/each}}
+          {{/if}}
+          <tr class="total">
+            <td>Total</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="num">{{num itemsTotal}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="after">
+        <div class="byline">
+          <p>{{#if preparedBy}}{{preparedBy}} @ {{/if}}{{dateTime createdAt}}</p>
+          {{#if notes}}<p class="pre"><b>Remarks:</b> {{notes}}</p>{{/if}}
+          {{#if cancelled}}<p><b>Cancelled:</b> {{cancelReason}}</p>{{/if}}
+        </div>
+        <table class="settle">
+          <tbody>
+            {{#if hasDiscount}}
+            <tr>
+              <td>Discount:</td>
+              <td>-{{num discount}}</td>
+            </tr>
+            {{/if}}
+            {{#if hasTax}}
+            <tr>
+              <td>Tax ({{taxPercent}}%):</td>
+              <td>{{num taxAmount}}</td>
+            </tr>
+            {{/if}}
+            <tr class="strong">
+              <td>Payable:</td>
+              <td>{{num total}}</td>
+            </tr>
+            <tr>
+              <td>Received:{{#if receivedVia}} ({{receivedVia}}){{/if}}</td>
+              <td>{{num paidAmount}}</td>
+            </tr>
+            <tr class="due">
+              <td>Balance:</td>
+              <td>{{num balance}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {{#if terms.length}}
+      <div class="note">
+        <h3>Note:</h3>
+        {{#each terms}}<p>{{inc @index}}). {{this}}</p>{{/each}}
+      </div>
+      {{/if}}
+
+      {{#if settings.bill_footer}}<p class="fine">{{settings.bill_footer}}</p>{{/if}}
+    </section>
+    {{/inline}}
+
+    {{#each copies}}{{> slip @root copyName=copyName}}{{/each}}
+
+    {{#if autoPrint}}
+    <script>
+      window.addEventListener('load', () => window.print());
+    </script>
+    {{/if}}
+  </body>
+</html>

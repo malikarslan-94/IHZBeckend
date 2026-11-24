@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{receiptNo}}</title>
+    <style>
+      {{{styles}}}
+    </style>
+    <style>
+      {{#if twoUp}}
+      @page { size: A4 portrait; margin: 0; }
+      {{else}}
+      @page { size: A5 landscape; margin: 6mm 9mm 5mm 0; }
+      {{/if}}
+    </style>
+  </head>
+  <body class="{{#if twoUp}}two-up{{else}}single{{/if}}">
+    {{#*inline "slip"}}
+    <section class="sheet">
+      <header class="head">
+        <div class="brand">
+          {{#if logo}}<img class="logo" src="{{logo}}" alt="" />{{/if}}
+          <div>
+            <h1>{{settings.company_name}}</h1>
+            {{#if settings.company_email}}<p>Email: {{settings.company_email}}</p>{{/if}}
+            {{#if whatsapp}}<p>WhatsApp: {{whatsapp}}</p>{{/if}}
+          </div>
+        </div>
+        <div class="contact">
+          {{#if copyName}}<p class="copy">{{copyName}}</p>{{/if}}
+          {{#if settings.company_address}}<p>{{settings.company_address}}</p>{{/if}}
+          {{#if settings.company_phone}}<p>Phone: {{settings.company_phone}}</p>{{/if}}
+        </div>
+      </header>
+
+      <div class="band">
+        <span>Patient ID: {{patient.patientCode}}</span>
+        <span>Bill#: {{bill.billNo}}</span>
+        <span>Receipt#: {{receiptNo}}</span>
+      </div>
+
+      <div class="info">
+        <p class="field"><b>Name:</b> <span class="strong">{{patient.fullName}}</span></p>
+        <p class="field"><b>Age/Gender:</b> <span>{{patient.ageGender}}</span></p>
+        <p class="field"><b>Date:</b> <span>{{date paymentDate}}</span></p>
+
+        <p class="field"><b>Guardian:</b> <span>{{patient.guardian}}</span></p>
+        <p class="field"><b>Contact:</b> <span>{{patient.phone}}</span></p>
+        <p class="field"><b>Method:</b> <span>{{methodText}}</span></p>
+
+        <p class="field"><b>Address:</b> <span>{{bill.request.serviceAddress}}</span></p>
+        <p class="field"><b>Request#:</b> <span>{{bill.request.requestNo}}</span></p>
+        <p class="field"><b>Ref No:</b> <span>{{referenceNo}}</span></p>
+      </div>
+
+      <table class="items">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Payment Date</th>
+            <th>Method</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Payment against Bill# {{bill.billNo}}</td>
+            <td>{{date paymentDate}}</td>
+            <td>{{methodText}}</td>
+            <td class="num">{{num amount}}</td>
+          </tr>
+          <tr class="total">
+            <td>Total</td>
+            <td></td>
+            <td></td>
+            <td class="num">{{num amount}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="after">
+        <div class="byline">
+          <p>{{#if receivedBy}}{{receivedBy}} @ {{/if}}{{dateTime createdAt}}</p>
+        </div>
+        <table class="settle">
+          <tbody>
+            <tr class="strong">
+              <td>Bill payable:</td>
+              <td>{{num bill.total}}</td>
+            </tr>
+            <tr>
+              <td>Received to date:</td>
+              <td>{{num bill.paidAmount}}</td>
+            </tr>
+            <tr class="due">
+              <td>Balance:</td>
+              <td>{{num bill.balance}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {{#if terms.length}}
+      <div class="note">
+        <h3>Note:</h3>
+        {{#each terms}}<p>{{inc @index}}). {{this}}</p>{{/each}}
+      </div>
+      {{/if}}
+
+      {{#if settings.bill_footer}}<p class="fine">{{settings.bill_footer}}</p>{{/if}}
+    </section>
+    {{/inline}}
+
+    {{#each copies}}{{> slip @root copyName=copyName}}{{/each}}
+
+    <script>
+      window.addEventListener('load', () => window.print());
+    </script>
+  </body>
+</html>

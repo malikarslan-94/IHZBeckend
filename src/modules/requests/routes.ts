@@ -2,7 +2,15 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/db.js';
 import { office } from '../../middleware/requireRole.js';
-import { requestSchema, requestFields, itemSchema, requestStatuses } from '../../../shared/schema.js';
+import {
+  requestSchema,
+  requestFields,
+  itemSchema,
+  requestStatuses,
+  chargeLineSchema,
+  chargeLinesSchema,
+  nurseChargeSchema,
+} from '../../../shared/schema.js';
 import { query, id, listResult, searchFields } from '../../lib/query.js';
 import { dateRange } from '../../lib/dates.js';
 import { nextNumber } from '../../lib/numberGenerator.js';
@@ -16,6 +24,9 @@ import {
   snapshotItems,
   requestInclude,
   billCharges,
+  chargeTotal,
+  snapshotChargeLines,
+  replaceChargeLines,
 } from '../bills/service.js';
 import { calculateBill } from '../../lib/billCalculator.js';
 export const requestRoutes = Router();
@@ -33,6 +44,12 @@ const nurseInclude = {
   },
   nurse: { select: { id: true, fullName: true } },
   items: { select: { description: true, quantity: true, unit: true, serviceDate: true } },
+  // Nurses see the items they used but never rates or amounts.
+  chargeLines: {
+    orderBy: { sortOrder: 'asc' as const },
+    select: { id: true, description: true, quantity: true, createdById: true },
+  },
+  bill: { select: { id: true } },
 };
 function scope(req: any) {
   return req.user.role === 'NURSE' ? { nurseId: req.user.nurseId ?? -1 } : {};
@@ -91,8 +108,9 @@ requestRoutes.post('/', office, async (req, res) => {
           'Choose an active nurse.',
         );
       const items = await snapshotItems(tx, input.items);
+      const chargeLines = await snapshotChargeLines(tx, input.chargeLines, [], req.user.id);
       const charges = await billCharges(tx, input.charges, req.user);
-      calculateBill(items, charges);
+      calculateBill(items, { ...charges, extraCharges: chargeTotal(chargeLines) });
       const request = await tx.serviceRequest.create({
         data: {
           requestNo: await nextNumber(tx, 'REQ', 'IHZ-'),
@@ -107,12 +125,14 @@ requestRoutes.post('/', office, async (req, res) => {
           status: input.nurseId ? 'ASSIGNED' : 'NEW',
           createdById: req.user.id,
           items: { create: items },
+          chargeLines: { create: chargeLines },
           draftCharges: { create: charges },
         },
       });
       await log(tx, req.user.id, 'CREATE', 'ServiceRequest', request.id, {
         requestNo: request.requestNo,
         items,
+        chargeLines,
       });
       if (input.generateBill) await generateBill(tx, request.id, undefined, req.user);
       return tx.serviceRequest.findUniqueOrThrow({ where: { id: request.id }, include: requestInclude });
@@ -208,7 +228,7 @@ async function changeItems(req: any, mode: 'replace' | 'add' | 'edit' | 'delete'
     const items = await snapshotItems(tx, inputs, request.items);
     if (!request.bill) {
       const charges = await billCharges(tx, undefined, req.user, request.draftCharges);
-      calculateBill(items, charges);
+      calculateBill(items, { ...charges, extraCharges: chargeTotal(request.chargeLines) });
     }
     await tx.requestItem.deleteMany({ where: { requestId: request.id } });
     await tx.requestItem.createMany({ data: items.map((i) => ({ ...i, requestId: request.id })) });
@@ -229,6 +249,65 @@ requestRoutes.patch('/:id/items/:itemId', office, async (req, res) =>
 );
 requestRoutes.delete('/:id/items/:itemId', office, async (req, res) =>
   res.json(await changeItems(req, 'delete')),
+);
+// Additional charges. The office replaces the whole list; the assigned nurse can log items from
+// the list (always at the list rate) and remove the ones they logged, until the bill is generated.
+async function changeChargeLines(req: any, mode: 'replace' | 'add' | 'delete') {
+  const nurse = req.user.role === 'NURSE';
+  return db.$transaction(async (tx) => {
+    const request = await lockRequest(tx, id(req.params.id));
+    if (nurse) {
+      assert(
+        request.nurseId !== null && request.nurseId === req.user.nurseId,
+        404,
+        'NOT_FOUND',
+        'Request not found.',
+      );
+      assert(!request.bill, 409, 'BILL_EXISTS', 'The bill has been generated. Ask the office to change items.');
+    } else canEdit(request.bill, req.user);
+    assert(request.status !== 'CANCELLED', 409, 'CANCELLED', 'Cancelled requests cannot be edited.');
+    const current = request.chargeLines.map((l) => ({
+      ...l,
+      quantity: Number(l.quantity),
+      rate: Number(l.rate),
+    }));
+    let inputs: any[];
+    if (mode === 'replace') inputs = chargeLinesSchema.parse(req.body);
+    else if (mode === 'add')
+      inputs = [...current, nurse ? nurseChargeSchema.parse(req.body) : chargeLineSchema.parse(req.body)];
+    else {
+      const lineId = id(req.params.lineId);
+      const line = current.find((l) => l.id === lineId);
+      assert(line, 404, 'NOT_FOUND', 'Line not found.');
+      assert(!nurse || line.createdById === req.user.id, 403, 'FORBIDDEN', 'You can only remove items you logged.');
+      inputs = current.filter((l) => l.id !== lineId);
+    }
+    assert(inputs.length <= 50, 422, 'CHARGE_LIMIT', 'Use at most 50 additional charges per request.');
+    // Runs in the transaction, so a validation error below rolls these writes back.
+    const lines = await replaceChargeLines(tx, request.id, inputs, request.chargeLines, req.user.id);
+    if (request.bill) await recalculate(tx, request.bill.id);
+    else {
+      const charges = await billCharges(tx, undefined, req.user, request.draftCharges);
+      calculateBill(request.items, { ...charges, extraCharges: chargeTotal(lines) });
+    }
+    await log(tx, req.user.id, 'UPDATE', 'ServiceRequest', request.id, {
+      chargeLinesBefore: request.chargeLines,
+      chargeLinesAfter: lines,
+    });
+    return tx.serviceRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: nurse ? nurseInclude : requestInclude,
+    });
+  });
+}
+requestRoutes.put('/:id/charge-lines', office, async (req, res) =>
+  res.json(await changeChargeLines(req, 'replace')),
+);
+requestRoutes.post('/:id/charge-lines', async (req, res) =>
+  res.status(201).json(await changeChargeLines(req, 'add')),
+);
+requestRoutes.delete('/:id/charge-lines/:lineId', async (req, res) =>
+  res.json(await changeChargeLines(req, 'delete')),
 );
 requestRoutes.post('/:id/bill', office, async (req, res) =>
   res

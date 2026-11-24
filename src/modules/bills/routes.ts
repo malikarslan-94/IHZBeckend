@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/db.js';
 import { office, admin } from '../../middleware/requireRole.js';
-import { billSchema, billStatuses, reasonSchema } from '../../../shared/schema.js';
+import { billSchema, billStatuses, reasonSchema, chargeLinesSchema } from '../../../shared/schema.js';
 import { query, id, listResult, searchFields } from '../../lib/query.js';
 import { dateRange } from '../../lib/dates.js';
 import { log } from '../../lib/activity.js';
 import { assert } from '../../lib/errors.js';
-import { lockBill, canEdit, recalculate, billInclude } from './service.js';
-import { billHtml, createPdf } from '../../lib/pdf.js';
+import { lockBill, canEdit, recalculate, billInclude, replaceChargeLines } from './service.js';
+import { billHtml, createPdf, printFormats } from '../../lib/pdf.js';
 export const billRoutes = Router();
 billRoutes.use(office);
 billRoutes.get('/', async (req, res) => {
@@ -39,7 +39,10 @@ billRoutes.get('/:id', async (req, res) =>
   res.json(await db.bill.findUniqueOrThrow({ where: { id: id(req.params.id) }, include: billInclude })),
 );
 billRoutes.patch('/:id', async (req, res) => {
-  const data = billSchema.partial().parse(req.body);
+  const { chargeLines, ...data } = billSchema
+    .partial()
+    .extend({ chargeLines: chargeLinesSchema.optional() })
+    .parse(req.body);
   res.json(
     await db.$transaction(async (tx) => {
       const before = await lockBill(tx, id(req.params.id));
@@ -50,6 +53,8 @@ billRoutes.patch('/:id', async (req, res) => {
         'TAX_ROLE',
         'Only an admin can change the tax rate.',
       );
+      if (chargeLines)
+        await replaceChargeLines(tx, before.requestId, chargeLines, before.request.chargeLines, req.user.id);
       await tx.bill.update({ where: { id: before.id }, data });
       const after = await recalculate(tx, before.id);
       await log(tx, req.user.id, 'UPDATE', 'Bill', before.id, { before, after });
@@ -75,7 +80,7 @@ billRoutes.post('/:id/cancel', admin, async (req, res) => {
 billRoutes.get('/:id/:output', async (req, res, next) => {
   const output = String(req.params.output);
   if (!['pdf', 'print', 'preview'].includes(output)) return next();
-  const format = z.enum(['a4', 'thermal']).default('a4').parse(req.query.format);
+  const format = z.enum(printFormats).default('a5').parse(req.query.format);
   const bill = await db.bill.findUniqueOrThrow({ where: { id: id(req.params.id) }, include: billInclude });
   const html = await billHtml(bill, format, output === 'print');
   if (output === 'pdf') {

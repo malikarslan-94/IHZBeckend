@@ -61,21 +61,51 @@ export const serviceSchema = z.object({
   description: optionalText,
   isActive: z.boolean().default(true),
 });
+const quantitySchema = moneySchema.refine(
+  (v) => v > 0 && v <= 99999999.99,
+  'Quantity must be greater than zero.',
+);
 export const itemSchema = z.object({
   id: z.number().int().positive().optional(),
   serviceId: z.coerce.number().int().positive(),
   description: z.string().trim().min(1).max(300).optional(),
   serviceDate: blankOptional(dateSchema),
-  quantity: moneySchema.refine((v) => v > 0 && v <= 99999999.99, 'Quantity must be greater than zero.'),
+  quantity: quantitySchema,
   rate: moneySchema.optional(),
   sortOrder: z.number().int().min(0).optional(),
 }).superRefine((item, context) => {
   if (item.rate !== undefined && new Decimal(item.quantity).mul(item.rate).toDecimalPlaces(2).gt('9999999999.99'))
     context.addIssue({ code: 'custom', path: ['rate'], message: 'Line amount exceeds the supported limit.' });
 });
+// The list of billable items (cannula, drip set…) that can be added as additional charges.
+export const chargeItemSchema = z.object({
+  name: z.string().trim().min(2).max(150),
+  defaultRate: moneySchema,
+  isActive: z.boolean().default(true),
+});
+// One additional-charge line: an item from the list (name and rate default from the list)
+// or a custom line, which needs its own description and rate.
+export const chargeLineSchema = z.object({
+  id: z.number().int().positive().optional(),
+  chargeItemId: blankOptional(z.coerce.number().int().positive()),
+  description: z.string().trim().max(300).optional(),
+  quantity: quantitySchema,
+  rate: blankOptional(moneySchema),
+}).superRefine((line, context) => {
+  if (!line.chargeItemId && !line.description)
+    context.addIssue({ code: 'custom', path: ['description'], message: 'Describe this charge.' });
+  if (!line.chargeItemId && line.rate == null)
+    context.addIssue({ code: 'custom', path: ['rate'], message: 'Enter a rate for this charge.' });
+  if (line.rate != null && new Decimal(line.quantity).mul(line.rate).toDecimalPlaces(2).gt('9999999999.99'))
+    context.addIssue({ code: 'custom', path: ['rate'], message: 'Line amount exceeds the supported limit.' });
+});
+export const chargeLinesSchema = z.array(chargeLineSchema).max(50);
+// What a nurse sends when logging an item used on a visit; the rate always comes from the list.
+export const nurseChargeSchema = z.object({
+  chargeItemId: z.coerce.number({ invalid_type_error: 'Choose an item.' }).int().positive('Choose an item.'),
+  quantity: quantitySchema,
+});
 export const billSchema = z.object({
-  extraCharges: moneySchema.default(0),
-  extraChargesNote: optionalText,
   discount: moneySchema.default(0),
   taxPercent: z.preprocess(
     (value) => value === '' || value === null ? undefined : value,
@@ -95,6 +125,7 @@ export const requestFields = z.object({
   notes: optionalText,
   status: z.enum(requestStatuses).optional(),
   items: z.array(itemSchema).max(100).default([]),
+  chargeLines: chargeLinesSchema.default([]),
   generateBill: z.boolean().default(false),
   charges: billSchema.optional(),
 });

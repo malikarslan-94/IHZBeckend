@@ -1,5 +1,7 @@
-export const money = (v: unknown) =>
-  `Rs ${Number(v || 0).toLocaleString('en-PK', { maximumFractionDigits: Number(v) % 1 ? 2 : 0 })}`;
+// Grouped number without the currency prefix, e.g. "2,450".
+export const plainAmount = (v: unknown) =>
+  Number(v || 0).toLocaleString('en-PK', { maximumFractionDigits: Number(v) % 1 ? 2 : 0 });
+export const money = (v: unknown) => `Rs ${plainAmount(v)}`;
 const small = [
   'zero',
   'one',

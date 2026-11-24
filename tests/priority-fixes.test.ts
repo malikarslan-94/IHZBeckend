@@ -55,19 +55,21 @@ describe.sequential('Priority billing and validation regressions', () => {
     expect(immediate.body.bill.total).toBe('690'); expect(delayed.body.total).toBe('690');
   });
   it('retains saved charges, tax and notes across reads and billing', async () => {
-    const created = await admin.post('/api/requests').set(header).send(payload({ charges: { extraCharges: 123, discount: 23, taxPercent: 15, extraChargesNote: 'Travel', notes: 'Draft invoice note' } }));
+    const created = await admin.post('/api/requests').set(header).send(payload({ chargeLines: [{ description: 'Travel', quantity: 1, rate: 123 }], charges: { discount: 23, taxPercent: 15, notes: 'Draft invoice note' } }));
     expect(created.status).toBe(201);
     const reopened = await staff.get(`/api/requests/${created.body.id}`);
-    expect(reopened.body.draftCharges).toMatchObject({ extraCharges: '123', discount: '23', taxPercent: '15', extraChargesNote: 'Travel', notes: 'Draft invoice note' });
+    expect(reopened.body.draftCharges).toMatchObject({ discount: '23', taxPercent: '15', notes: 'Draft invoice note' });
+    expect(reopened.body.chargeLines).toMatchObject([{ description: 'Travel', quantity: '1', rate: '123', amount: '123' }]);
     const billed = await staff.post(`/api/requests/${created.body.id}/bill`).set(header).send({});
     expect(billed.status).toBe(201); expect(billed.body.total).toBe('805');
-    expect(billed.body.notes).toBe('Draft invoice note'); expect(billed.body.extraChargesNote).toBe('Travel');
+    expect(billed.body.notes).toBe('Draft invoice note'); expect(billed.body.extraCharges).toBe('123');
+    expect(billed.body.request.chargeLines[0].description).toBe('Travel');
     expect((await admin.post(`/api/requests/${created.body.id}/bill`).set(header).send({})).status).toBe(409);
   });
   it('preserves explicit zero tax and supports explicit zero charge overrides', async () => {
-    const draft = await admin.post('/api/requests').set(header).send(payload({ charges: { extraCharges: 123, discount: 23, taxPercent: 0 } }));
+    const draft = await admin.post('/api/requests').set(header).send(payload({ chargeLines: [{ description: 'Travel', quantity: 1, rate: 123 }], charges: { discount: 23, taxPercent: 0 } }));
     expect(draft.status).toBe(201);
-    const bill = await admin.post(`/api/requests/${draft.body.id}/bill`).set(header).send({ extraCharges: 0, discount: 0 });
+    const bill = await admin.post(`/api/requests/${draft.body.id}/bill`).set(header).send({ chargeLines: [], discount: 0 });
     expect(bill.status).toBe(201); expect(bill.body.taxPercent).toBe('0'); expect(bill.body.total).toBe('600');
     const immediate = await admin.post('/api/requests').set(header).send(payload({ generateBill: true, charges: { taxPercent: 0 } }));
     expect(immediate.status).toBe(201); expect(immediate.body.bill.total).toBe('600');
@@ -86,10 +88,33 @@ describe.sequential('Priority billing and validation regressions', () => {
     expect(billed.status).toBe(201); expect(billed.body.taxPercent).toBe('0');
   });
   it('does not add draft financial data to nurse responses', async () => {
-    const draft = await admin.post('/api/requests').set(header).send(payload({ nurseId, charges: { extraCharges: 123, notes: 'PRIVATE_DRAFT_BILL_NOTE' } }));
+    const draft = await admin.post('/api/requests').set(header).send(payload({ nurseId, chargeLines: [{ description: 'Travel', quantity: 1, rate: 123 }], charges: { notes: 'PRIVATE_DRAFT_BILL_NOTE' } }));
     const detail = await nurse.get(`/api/requests/${draft.body.id}`);
     expect(detail.status).toBe(200); expect(detail.body.draftCharges).toBeUndefined();
+    expect(detail.body.chargeLines[0].description).toBe('Travel'); expect(detail.body.chargeLines[0].rate).toBeUndefined();
     expect(JSON.stringify((await nurse.get('/api/requests')).body)).not.toContain('PRIVATE_DRAFT_BILL_NOTE');
+  });
+  it('lets the assigned nurse log list items at the list rate until the bill is generated', async () => {
+    expect((await staff.post('/api/charge-items').set(header).send({ name: 'Staff Item', defaultRate: 1 })).status).toBe(403);
+    const item = await admin.post('/api/charge-items').set(header).send({ name: 'IV Cannula 22G', defaultRate: 150 });
+    expect(item.status).toBe(201);
+    const listed = await nurse.get('/api/charge-items');
+    expect(listed.body.data).toEqual([{ id: item.body.id, name: 'IV Cannula 22G' }]);
+    const unassigned = await admin.post('/api/requests').set(header).send(payload());
+    expect((await nurse.post(`/api/requests/${unassigned.body.id}/charge-lines`).set(header).send({ chargeItemId: item.body.id, quantity: 1 })).status).toBe(404);
+    const draft = await admin.post('/api/requests').set(header).send(payload({ nurseId, charges: { taxPercent: 0 } }));
+    const logged = await nurse.post(`/api/requests/${draft.body.id}/charge-lines`).set(header).send({ chargeItemId: item.body.id, quantity: 2, rate: 1 });
+    expect(logged.status).toBe(201);
+    expect(logged.body.chargeLines).toMatchObject([{ description: 'IV Cannula 22G', quantity: '2' }]);
+    expect(logged.body.chargeLines[0].rate).toBeUndefined();
+    const office = await staff.get(`/api/requests/${draft.body.id}`);
+    expect(office.body.chargeLines[0]).toMatchObject({ rate: '150', amount: '300' });
+    const billed = await staff.post(`/api/requests/${draft.body.id}/bill`).set(header).send({});
+    expect(billed.status).toBe(201); expect(billed.body.extraCharges).toBe('300'); expect(billed.body.total).toBe('900');
+    expect((await nurse.post(`/api/requests/${draft.body.id}/charge-lines`).set(header).send({ chargeItemId: item.body.id, quantity: 1 })).status).toBe(409);
+    expect((await nurse.delete(`/api/requests/${draft.body.id}/charge-lines/${logged.body.chargeLines[0].id}`).set(header)).status).toBe(409);
+    const edited = await staff.patch(`/api/bills/${billed.body.id}`).set(header).send({ chargeLines: [{ id: office.body.chargeLines[0].id, chargeItemId: item.body.id, quantity: 1 }] });
+    expect(edited.status).toBe(200); expect(edited.body.extraCharges).toBe('150'); expect(edited.body.total).toBe('750');
   });
   it.each(['2026-02-31', '2026-99-99', '2025-02-29', '', null, true])('rejects invalid request date %s without inserting records', async (requestDate) => {
     const before = await db.serviceRequest.count();

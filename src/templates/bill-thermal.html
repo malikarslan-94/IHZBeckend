@@ -79,10 +79,19 @@
       <div>{{quantity}} × {{money rate}} = {{money amount}}</div>
     </div>
     {{/each}}
+    {{#if chargeLines.length}}
+    <hr />
+    <p><strong>Additional charges</strong></p>
+    {{#each chargeLines}}
+    <div class="item">
+      <strong>{{description}}</strong>
+      <div>{{quantity}} × {{money rate}} = {{money amount}}</div>
+    </div>
+    {{/each}}
+    {{/if}}
     <hr />
     <div class="row"><span>Subtotal</span><span>{{money subtotal}}</span></div>
-    <div class="row"><span>Extra charges</span><span>{{money extraCharges}}</span></div>
-    <p>{{extraChargesNote}}</p>
+    {{#if hasExtra}}<div class="row"><span>Additional charges</span><span>{{money extraCharges}}</span></div>{{/if}}
     <div class="row"><span>Discount</span><span>{{money discount}}</span></div>
     <div class="row"><span>Tax {{taxPercent}}%</span><span>{{money taxAmount}}</span></div>
     <hr />

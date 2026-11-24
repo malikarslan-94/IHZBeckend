@@ -47,10 +47,10 @@ describe.sequential('Real PostgreSQL API workflow',()=>{
   expect((await nurse.get(`/api/patients/${otherPatientId}`)).status).toBe(404);
  });
  it('generates one sequential bill and keeps its rate snapshot after rate changes',async()=>{
-  const result=await staff.post(`/api/requests/${requestId}/bill`).set(header).send({extraCharges:100,discount:50});expect(result.status).toBe(201);billId=result.body.id;expect(result.body.total).toBe('1050');expect(result.body.billNo).toMatch(/^HN-\d{4}-0001$/);
+  const result=await staff.post(`/api/requests/${requestId}/bill`).set(header).send({chargeLines:[{description:'Travel',quantity:1,rate:100}],discount:50});expect(result.status).toBe(201);billId=result.body.id;expect(result.body.total).toBe('1050');expect(result.body.billNo).toMatch(/^HN-\d{4}-0001$/);
   expect((await staff.post(`/api/requests/${requestId}/bill`).set(header).send({})).status).toBe(409);
   await admin.patch(`/api/services/${serviceId}`).set(header).send({defaultRate:999});const requestResult=await staff.get(`/api/requests/${requestId}`);expect(requestResult.body.items[0].rate).toBe('500');
-  const preview=await staff.get(`/api/bills/${billId}/preview`);expect(preview.status).toBe(200);expect(preview.text).toContain('BILL / INVOICE');expect(preview.text).not.toContain('PRIVATE_MEDICAL_NOTE');expect(preview.text).not.toContain('03001234561');
+  const preview=await staff.get(`/api/bills/${billId}/preview`);expect(preview.status).toBe(200);expect(preview.text).toContain('Test Home Care');expect(preview.text).not.toContain('PRIVATE_MEDICAL_NOTE');expect(preview.text).not.toContain('03001234561');
  });
  it('allows staff to edit before payment and rejects invalid amounts and dates',async()=>{
   const result=await staff.patch(`/api/bills/${billId}`).set(header).send({discount:100});expect(result.status).toBe(200);expect(result.body.total).toBe('1000');
